@@ -49,7 +49,7 @@ class FitData:
             self.exposure = hdul[0].header['EXPOSURE']
             # what to fo if not found FIMXE
     def __str__(self):
-        return f"{self.filename} {self.filetype} {self.obsobject}"
+        return f"{self.filename} {self.filetype} {self.obsobject} {self.filtertype}"
         
 def get_fits(s,seq):
     # if there is a current sequence loaded, return a list of all the included (ie selected) FITS files
@@ -75,7 +75,6 @@ def get_fits_data(fn):
         ret.append(FitData(hdul))
     return ret
 
-siril.log("NINA_flat_preprocessing starting")
 
 # connect to siril    
 siril = s.SirilInterface()
@@ -84,6 +83,8 @@ try:
    print("Connected successfully!")
 except SirilConnectionError as e:
    print(f"Connection failed: {e}")
+   
+siril.log("NINA_flat_preprocessing starting")
 
 # make sure we are in the FLAT directory
 cwd = os.getcwd()
@@ -92,10 +93,11 @@ if not os.path.basename(cwd) == "FLAT":
     sys.exit(1)
 
 # if no loaded sequence, give the user the opportunity to do that and cull bad subs first
+cur_seq = None
 try:
     cur_seq = siril.get_seq()
 except s.exceptions.NoSequenceError:
-    ret = siril.confirm_messagebox("Proceed without sequence?","No current sequence exists. Loading a sequence of all the flats lets you cull bad subs before processing. (No need to separate them by filter; the script will do that.) Quit and set the sequence?","Quit the script, or cancel to continue")
+    ret = siril.confirm_messagebox("Proceed without sequence?","No current sequence exists. Loading a sequence of all the flats lets you cull bad subs before processing. (No need to separate them by filter; the script will do that.) Quit and set the sequence, or cancel to continue with all files","Quit the script")
     if ret:
         sys.exit(1)
 
@@ -140,7 +142,8 @@ for f in allFilters:
     siril.log(f"calibrated {f} flats; new sequence is {calibrated_filter_flats_seq_name}")
     
     # stack the flats. output will be in parent directory
-    stacked_flat_fname = f"{f}_flat_stacked"
+    datestamp = f_fitfiles[0].obsdateloc
+    stacked_flat_fname = f"{f}_flat_{datestamp}_stacked"
     siril.cmd("stack",calibrated_filter_flats_seq_name,f"rej w 3 3 -nonorm -out=../{stacked_flat_fname}")
     siril.log(f"stacking for {f} flats completed and file {stacked_flat_fname} copied to parent FLAT directory")
     siril.cmd("cd", "..")
